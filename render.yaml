@@ -4,7 +4,7 @@ services:
     name: mysite
     runtime: python
     buildCommand: "pip install -r requirements.txt"
-    startCommand: "gunicorn mysite.asgi:application -k uvicorn.workers.UvicornWorker"
+    startCommand: "gunicorn obn_app.wsgi:application"
     envVars:
       - key: DJANGO_SETTINGS_MODULE
         value: "obn_app.settings"
