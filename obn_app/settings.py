@@ -21,12 +21,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-yt80=ysb3%cb6!a#-)#uhfekds5ztb&o+u@fk01l4aa=y$#l4r'
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-yt80=ysb3%cb6!a#-)#uhfekds5ztb&o+u@fk01l4aa=y$#l4r')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['obnapp.onrender.com', '127.0.0.1:8000', '127.0.0.1']
+ALLOWED_HOSTS = ['https://obnapp.onrender.com', 'localhost', '127.0.0.1']
 
 
 # Application definition
@@ -120,9 +120,10 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
-STATIC_URL = 'static/'
-STATIC_ROOT = BASE_DIR / 'staticfiles'
-
+# STATIC_URL = 'static/'
+# STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
