@@ -8,15 +8,6 @@ class File(models.Model):
     def __str__(self):
         return self.name
 
-class Point(models.Model):
-    file = models.ForeignKey(File, on_delete=models.CASCADE, related_name='points')
-    shotpoint = models.IntegerField()
-    east = models.FloatField()
-    north = models.FloatField()
-
-    def __str__(self):
-        return f"{self.file.name} - Shotpoint {self.shotpoint}: ({self.east}, {self.north})"
-
 class Polygon(models.Model):
     name = models.CharField(max_length=100)
     coordinates = models.TextField()  # Store as JSON string
@@ -39,8 +30,22 @@ class PreplotLine(models.Model):
 
     def __str__(self):
         return f"Line {self.linename}: {self.shotpoint1} - {self.shotpoint2}"
+    
+class Points(models.Model):
+    preplotline = models.OneToOneField(PreplotLine, on_delete=models.CASCADE, related_name='points')
+    linename = models.IntegerField()
+    shotpoint = models.IntegerField()
+    easting = models.FloatField()
+    northing = models.FloatField()
+    latitude = models.FloatField()
+    longitude = models.FloatField()
+
+    def __str__(self):
+        return f"Line {self.linename}, SP {self.shotpoint}"
+
 
 class SequenceFile(models.Model):
+    preplotline = models.ForeignKey(PreplotLine, null=True, on_delete=models.CASCADE, related_name='sequence')
     preplot_number = models.IntegerField()
     type = models.IntegerField()
     pass_number = models.IntegerField()

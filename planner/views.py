@@ -4,10 +4,10 @@ import os
 # import tempfile
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
-from django.shortcuts import render, redirect, get_object_or_404
+from django.shortcuts import render, get_object_or_404
 from django.views import View
 from django.contrib import messages
-from .models import File, Point, Polygon, PreplotLine
+from .models import File, Points, Polygon, PreplotLine
 from .models import SequenceFile, SequenceFileDetail
 from .forms import CSVUploadForm
 import json
@@ -15,19 +15,21 @@ from django.http import JsonResponse
 from pyproj import CRS, Transformer
 from django.shortcuts import redirect
 # from django.db import transaction
-from .functions import srecords_to_df
+from .functions import srecords_to_df, grid_to_geographic
 import pandas as pd
 from background_task import background
 from django.core.exceptions import ValidationError
 from django.conf import settings
 from django.utils import timezone
+from math import sqrt, atan2, degrees
+
 
 class HomeView(View):
 
     def get(self, request):
         # def get(self, request):
         files = File.objects.all()
-        points = Point.objects.all()
+        points = Points.objects.all()
         polygon = Polygon.objects.first()
         sequences = SequenceFile.objects.all()
         
@@ -61,6 +63,7 @@ class HomeView(View):
         lines = PreplotLine.objects.all()
         lines_data = [
             {
+                'id': line.id,
                 'linename': line.linename,
                 'latitude1': line.latitude1,
                 'longitude1': line.longitude1,
@@ -80,77 +83,10 @@ class HomeView(View):
         }
         return render(request, 'planner/home.html', context)
 
-class UploadCSVView(View):
-
-    @staticmethod
-    def utm_to_latlon(utm_easting, utm_northing, zone=15, northern_hemisphere=True):
-        """
-        Convert UTM coordinates to geographic coordinates (latitude, longitude in degrees).
-
-        Parameters:
-        utm_easting (float): Easting in meters.
-        utm_northing (float): Northing in meters.
-        zone (int): UTM zone number.
-        northern_hemisphere (bool): True if the UTM coordinates are in the northern hemisphere, False for southern hemisphere.
-
-        Returns:
-        tuple: (latitude, longitude) in degrees.
-        """
-        # Define the CRS for UTM Zone with WGS84
-        utm_crs = CRS(proj='utm', zone=zone, ellps='WGS84', datum='WGS84', south=not northern_hemisphere)
-
-        # Define the geographic coordinate system (WGS 84)
-        wgs84_crs = CRS(proj='latlong', ellps='WGS84', datum='WGS84')
-
-        # Create a transformer object to convert UTM to geographic coordinates
-        transformer = Transformer.from_crs(utm_crs, wgs84_crs)
-
-        # Perform the transformation from UTM to latitude/longitude
-        longitude, latitude = transformer.transform(utm_easting, utm_northing)
-
-        return latitude, longitude
-
-    def get(self, request):
-        form = CSVUploadForm()
-        return render(request, 'planner/upload.html', {'form': form})
-
-    def post(self, request):
-        form = CSVUploadForm(request.POST, request.FILES)
-        if form.is_valid():
-            csv_file = form.cleaned_data['csv_file']
-            filename = csv_file.name.split('.')[0]  # Get filename without extension
-
-            try:
-                file_obj = File.objects.create(name=filename)
-                
-                decoded_file = csv_file.read().decode('utf-8').splitlines()
-                reader = csv.reader(decoded_file)
-                next(reader)  # Skip the header row
-                
-                for row in reader:
-                    if len(row) >= 4:  # Ensure the row has at least 4 columns
-                        lat, long = self.utm_to_latlon(float(row[2]), float(row[3]))
-                        Point.objects.create(
-                            file=file_obj,
-                            shotpoint=int(row[1]),
-                            east=lat,
-                            north=long
-                        )
-                
-                messages.success(request, f"File '{filename}' uploaded successfully.")
-                return redirect('display_points')
-            except Exception as e:
-                messages.error(request, f"An error occurred while processing the file: {str(e)}")
-        else:
-            for error in form.errors.values():
-                messages.error(request, error)
-
-        return render(request, 'planner/upload.html', {'form': form})
-
 class DisplayPointsView(View):
     def get(self, request):
         files = File.objects.all()
-        points = Point.objects.all()
+        points = Points.objects.all()
         polygon = Polygon.objects.first()
         sequences = SequenceFile.objects.all()
         
@@ -211,7 +147,7 @@ class UploadPolygonView(View):
     
 class PointsDataView(View):
     def get(self, request):
-        points = Point.objects.all().values('shotpoint', 'east', 'north')
+        points = Points.objects.all()
         return JsonResponse(list(points), safe=False)
 
 class MapView(View):
@@ -412,3 +348,51 @@ class LoadSequenceView(View):
             messages.error(request, f'An unexpected error occurred: {str(e)}')
 
         return redirect('load_sequence')
+    
+class GeneratePointsView(View):
+    def get(self, request, preplotline_id):
+        preplotline = get_object_or_404(PreplotLine, id=preplotline_id)
+        linename = preplotline.linename
+        
+        # Calculate azimuth
+        delta_easting = preplotline.eastings2 - preplotline.eastings1
+        delta_northing = preplotline.northings2 - preplotline.northings1
+        distance = sqrt(delta_easting**2 + delta_northing**2)  # Total distance between points
+        azimuth = atan2(delta_easting, delta_northing)
+
+        # Shotpoint interval in meters
+        shotpoint_interval = 16.6666667
+
+        # Number of points to generate
+        num_points = int(distance // shotpoint_interval) + 1
+
+        points = []
+        for i in range(num_points + 1):
+            shotpoint = preplotline.shotpoint1 + i
+            fraction = i / num_points
+            easting = preplotline.eastings1 + fraction * delta_easting
+            northing = preplotline.northings1 + fraction * delta_northing
+            latitude, longitude = grid_to_geographic(easting, northing)
+
+            # Create or update Points instance
+            point, created = Points.objects.update_or_create(
+                preplotline=preplotline,
+                shotpoint=shotpoint,
+                defaults={
+                    'linename': linename,
+                    'easting': easting,
+                    'northing': northing,
+                    'latitude': latitude,
+                    'longitude': longitude,
+                }
+            )
+            points.append({
+                'linename': linename,
+                'shotpoint': shotpoint,
+                'easting': easting,
+                'northing': northing,
+                'latitude': latitude,
+                'longitude': longitude,
+            })
+
+        return JsonResponse({'points': points})

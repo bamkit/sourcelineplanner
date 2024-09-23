@@ -30,8 +30,8 @@
 <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
 <script>
     // Parse the preplot lines data
-    var preplotLines = {{ preplot_lines|safe }};
-    var sequencePoints = {{ sequence_points|safe }};
+    var preplotLines = JSON.parse('{{ preplot_lines|safe }}');
+    var sequencePoints = JSON.parse('{{ sequence_points|safe }}');
 
     var map = L.map('map').setView([0, 0], 2);  // Default view
 

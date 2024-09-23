@@ -19,7 +19,7 @@
         width: 100%;
     }
     .table-container {
-        height: 600px;
+        height: 400px;
         display: flex;
         flex-direction: column;
     }
@@ -94,6 +94,7 @@
                         <th>Source Line</th>
                         <th>Shotpoint 1</th>
                         <th>Shotpoint 2</th>
+                        <th>Generate Points</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -104,10 +105,6 @@
         <div id="no-lines-message" style="display: none;">
             <p>No Preplot lines have been loaded yet.</p>
         </div>
-        <form action="{% url 'delete_all_preplot_lines' %}" method="post" onsubmit="return confirm('Are you sure you want to delete ALL preplot lines? This action cannot be undone.');">
-            {% csrf_token %}
-            <button type="submit" class="delete-all-btn">Delete All Lines</button>
-        </form>
     </div>
 </div>
 {% endblock %}
@@ -136,6 +133,7 @@ document.addEventListener('DOMContentLoaded', function() {
             <td class="line-data">${line.linename}</td>
             <td class="line-data">${line.shotpoint1 || 'N/A'}</td>
             <td class="line-data">${line.shotpoint2 || 'N/A'}</td>
+            <td><button class="generate-points-btn" data-line-index="${index}">Generate Points</button></td>
         `;
         row.setAttribute('data-line-index', index);
         tableBody.appendChild(row);

@@ -1,4 +1,17 @@
 import pandas as pd
+from pyproj import Proj, transform
+
+# Define UTM projection
+utm_proj = Proj(proj="utm", zone=15, datum="WGS84", ellps="WGS84")
+# Define WGS 84 projection
+wgs84_proj = Proj(proj="latlong", datum="WGS84", ellps="WGS84")
+
+
+def grid_to_geographic(easting, northing):
+
+    longitude, latitude = transform(utm_proj, wgs84_proj, easting, northing)
+    return latitude, longitude
+
 
 def srecords_to_df(srec):
 
@@ -54,7 +67,6 @@ def srecords_to_df(srec):
     def ave_x(x1, x2, x3):
         meanx = (float(x1) + float(x2) + float(x3))/3
         return meanx
-
 
     df = pd.DataFrame(data=full_lines, columns=[
                                         'linename',
